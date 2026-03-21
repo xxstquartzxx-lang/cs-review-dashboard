@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>レビュー分析ダッシュボード</title>
+  <style>
+    :root {
+      --color-primary: #1A5B8E;
+      --color-primary-light: #2980B9;
+      --color-primary-dark: #134466;
+      --color-bg: #EEF1F5;
+      --color-box: #FFFFFF;
+      --color-text: #1A2332;
+      --color-text-light: #6B7C93;
+      --color-border: #E1E5EB;
+      --color-star: #F5A623;
+      --color-positive: #27AE60;
+      --color-negative: #E74C3C;
+      --shadow: 0 1px 4px rgba(0,0,0,0.06);
+      --radius: 10px;
+      --transition: 0.2s ease;
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:"Hiragino Kaku Gothic ProN","ヒラギノ角ゴ ProN W3","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+      background:var(--color-bg);color:var(--color-text);line-height:1.65;font-size:14px;-webkit-font-smoothing:antialiased;
+    }
+
+    /* === ヘッダー：白背景＋左の青バー === */
+    .header{
+      background:var(--color-box);padding:0;
+      border-bottom:3px solid var(--color-primary);
+    }
+    .header-inner{
+      max-width:1200px;margin:0 auto;padding:18px 24px;
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+    }
+    .header-title{display:flex;align-items:center;gap:12px}
+    .header-title .bar{width:4px;height:28px;background:var(--color-primary);border-radius:2px;flex-shrink:0}
+    .header h1{font-size:20px;font-weight:700;color:var(--color-text);letter-spacing:.01em}
+    .header .subtitle{font-size:12px;color:var(--color-text-light);font-weight:400}
+    .header .upload-badge{
+      font-size:12px;color:var(--color-primary);display:flex;align-items:center;gap:6px;
+      cursor:pointer;padding:6px 14px;border-radius:6px;border:1.5px solid var(--color-border);
+      background:var(--color-box);transition:all var(--transition);
+    }
+    .header .upload-badge:hover{border-color:var(--color-primary);background:#F0F7FC}
+
+    .container{max-width:1200px;margin:0 auto;padding:20px 24px 48px}
+
+    /* === アップロードエリア === */
+    .upload-area{background:var(--color-box);border:2px dashed var(--color-border);border-radius:var(--radius);padding:36px 24px;text-align:center;cursor:pointer;transition:border-color var(--transition),background var(--transition);margin-bottom:20px;box-shadow:var(--shadow)}
+    .upload-area:hover,.upload-area.dragover{border-color:var(--color-primary);background:#F0F7FC}
+    .upload-area .icon{font-size:36px;margin-bottom:8px;filter:grayscale(1) opacity(.4)}
+    .upload-area .label{font-size:15px;font-weight:600;color:var(--color-primary);margin-bottom:2px}
+    .upload-area .hint{font-size:12px;color:var(--color-text-light)}
+    .upload-area .guide{display:inline-block}
+    .upload-area input[type="file"]{display:none}
+    .upload-area.loaded{padding:0;border:none;box-shadow:none;margin:0;height:0;overflow:hidden}
+
+    .dashboard{display:none}
+    .dashboard.visible{display:block;animation:fadeUp .35s ease}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+    /* === 対象期間 === */
+    .data-period{
+      background:var(--color-box);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:12px 20px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--color-text);
+    }
+    .data-period .period-icon{font-size:15px;filter:grayscale(1) opacity(.4)}
+    .data-period .period-label{color:var(--color-text-light);font-weight:600;font-size:12px}
+    .data-period .period-value{font-weight:700;color:var(--color-primary);font-size:15px}
+
+    /* === 全体サマリー（KPIカード）=== */
+    .global-summary{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+    .global-card{
+      background:var(--color-box);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:20px 24px;border-top:3px solid var(--color-primary);
+    }
+    .global-card .gc-icon{display:none}
+    .global-card .gc-label{font-size:12px;color:var(--color-text-light);margin-bottom:6px;font-weight:600}
+    .global-card .gc-score{font-size:32px;font-weight:700;color:var(--color-text);line-height:1.1}
+    .global-card .gc-detail{font-size:12px;color:var(--color-text-light);margin-top:4px}
+    @media(max-width:640px){.global-summary{grid-template-columns:1fr}}
+
+    /* === 商品セレクター === */
+    .product-selector{
+      display:flex;align-items:center;gap:12px;
+      background:var(--color-box);border-radius:var(--radius);
+      padding:12px 20px;margin-bottom:20px;box-shadow:var(--shadow);flex-wrap:wrap;
+    }
+    .product-selector label{font-weight:700;font-size:13px;color:var(--color-text);white-space:nowrap}
+    .product-selector select{
+      flex:1;min-width:200px;padding:7px 12px;border:1.5px solid var(--color-border);
+      border-radius:6px;font-family:inherit;font-size:13px;color:var(--color-text);
+      background:var(--color-box);cursor:pointer;transition:border-color var(--transition);
+    }
+    .product-selector select:focus{outline:none;border-color:var(--color-primary)}
+    .product-count{font-size:11px;color:var(--color-text-light);margin-left:auto}
+
+    /* === 商品別サマリー（KPIカード）=== */
+    .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+    .summary-card{
+      background:var(--color-box);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:16px 20px;border-top:3px solid var(--color-primary);
+    }
+    .summary-card .ic{display:none}
+    .summary-card .info-label{font-size:11px;color:var(--color-text-light);margin-bottom:4px;font-weight:600}
+    .summary-card .info-value{font-size:24px;font-weight:700;color:var(--color-text);line-height:1.2}
+    .summary-card .info-sub{font-size:11px;color:var(--color-text-light);margin-top:4px}
+    .stars{color:var(--color-star);letter-spacing:1px;font-size:13px}
+
+    /* === セクション（折りたたみ）=== */
+    .section{background:var(--color-box);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+    .section-header{
+      display:flex;align-items:center;gap:10px;
+      padding:16px 20px;cursor:pointer;user-select:none;transition:background var(--transition);
+    }
+    .section-header:hover{background:#FAFBFC}
+    .section-header .emoji{display:none}
+    .section-header .bar{width:3px;height:18px;background:var(--color-primary);border-radius:2px;flex-shrink:0}
+    .section-header .title{font-size:15px;font-weight:700;color:var(--color-text);flex:1}
+    .section-header .chevron{width:18px;height:18px;transition:transform var(--transition);color:var(--color-text-light)}
+    .section-header .chevron svg{display:block}
+    .section.collapsed .section-header .chevron{transform:rotate(-90deg)}
+    .section-body{padding:0 20px 20px;overflow:hidden}
+    .section.collapsed .section-body{display:none}
+
+    /* === タブ === */
+    .tab-bar{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--color-bg)}
+    .tab-btn{
+      padding:8px 18px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;
+      background:none;cursor:pointer;font-size:13px;font-weight:600;
+      color:var(--color-text-light);transition:all var(--transition);font-family:inherit;border-radius:0;
+    }
+    .tab-btn:hover{color:var(--color-primary)}
+    .tab-btn.active{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+    .tab-content{display:none}
+    .tab-content.active{display:block;animation:fadeUp .2s ease}
+
+    /* === キーワードランキング === */
+    .keyword-list{list-style:none}
+    .keyword-item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--color-bg)}
+    .keyword-item:last-child{border-bottom:none}
+    .keyword-rank{
+      width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:10px;font-weight:700;background:var(--color-bg);color:var(--color-text-light);flex-shrink:0;
+    }
+    .keyword-rank.top{background:var(--color-primary);color:#fff}
+    .keyword-name{font-weight:600;font-size:13px;flex:1;min-width:60px}
+    .keyword-bar-wrap{flex:2;height:6px;background:var(--color-bg);border-radius:3px;overflow:hidden}
+    .keyword-bar{height:100%;border-radius:3px;background:var(--color-primary);transition:width .5s ease}
+    .keyword-count{font-size:12px;font-weight:600;color:var(--color-text-light);min-width:40px;text-align:right}
+
+    /* === 2カラム === */
+    .two-col{display:grid;grid-template-columns:2fr 3fr;gap:16px}
+    @media(max-width:800px){.two-col{grid-template-columns:1fr}}
+
+    /* === 共起ネットワーク === */
+    .cooccurrence-map{position:relative;width:100%;aspect-ratio:14/9;min-height:340px;background:var(--color-bg);border-radius:8px;overflow:hidden}
+    .cooccurrence-map svg{width:100%;height:100%;display:block}
+    .cooccurrence-map .empty-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+
+    /* === 改善提案 === */
+    .suggestion-list{list-style:none}
+    .suggestion-item{
+      display:flex;gap:10px;padding:12px 14px;margin-bottom:8px;
+      background:var(--color-bg);border-radius:8px;border-left:3px solid var(--color-primary);
+      font-size:13px;line-height:1.6;
+    }
+    .suggestion-item .badge{font-size:15px;flex-shrink:0}
+
+    /* === 月次推移 === */
+    .trend-chart-wrap{width:100%;overflow-x:auto;margin-bottom:16px}
+    .trend-chart-wrap svg{display:block;width:100%;height:auto}
+    .trend-table{width:100%;border-collapse:collapse;font-size:12px}
+    .trend-table th{background:var(--color-bg);color:var(--color-text-light);font-weight:600;padding:6px 10px;text-align:center;white-space:nowrap;position:sticky;top:0}
+    .trend-table td{padding:6px 10px;text-align:center;border-bottom:1px solid var(--color-bg);white-space:nowrap}
+    .trend-table tr:hover td{background:#F8F9FB}
+    .trend-table-wrap{max-height:220px;overflow-y:auto;border:1px solid var(--color-border);border-radius:8px}
+
+    .empty-msg{text-align:center;color:var(--color-text-light);padding:20px 0;font-size:13px}
+    .footer{text-align:center;padding:20px;color:var(--color-text-light);font-size:11px}
+
+    @media(max-width:640px){
+      .header-inner{padding:14px 16px}
+      .header h1{font-size:17px}
+      .container{padding:14px 12px 32px}
+      .summary-grid{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-title">
+        <div class="bar"></div>
+        <div>
+          <h1>レビュー分析ダッシュボード</h1>
+          <span class="subtitle">CSVから商品の強みと弱みを明確化します。</span>
+        </div>
+      </div>
+      <div class="upload-badge" id="headerUploadBtn">● CSVをアップロードしてください</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- CSVアップロードエリア -->
+    <div class="upload-area" id="uploadArea">
+      <div class="icon">📁</div>
+      <div class="label">CSVファイルをここにドラッグ＆ドロップ</div>
+      <div class="hint">または、クリックしてファイルを選択</div>
+      <div class="guide" style="margin-top:12px;font-size:12px;color:#6B7C93;line-height:1.7;text-align:left;max-width:520px">
+        📌 <strong>CSVの取得方法：</strong><br>
+        RMS ＞ コミュニティ ＞ レビューチェックツール ＞ そのまま何も触らずにCSVダウンロード<br>
+        <span style="font-size:11px;color:#8E8E93">（全期間の商品・ショップ両方のレビューが取得されます）</span>
+      </div>
+      <input type="file" id="csvInput" accept=".csv,.txt">
+    </div>
+
+    <!-- ★ ダッシュボード本体 -->
+    <div class="dashboard" id="dashboard">
+
+      <!-- データ対象期間 -->
+      <div class="data-period" id="dataPeriod" style="display:none"></div>
+
+      <!-- 店舗全体・商品全体のサマリー（CSV全件から算出・商品選択で変わらない） -->
+      <div class="global-summary" id="globalSummary"></div>
+
+      <!-- 商品名セレクター -->
+      <div class="product-selector">
+        <label>🛒 商品を選択：</label>
+        <select id="productSelect"><option value="__ALL__">すべての商品</option></select>
+        <span class="product-count" id="productCount"></span>
+      </div>
+
+      <!-- サマリー -->
+      <div class="summary-grid" id="summaryGrid"></div>
+
+      <!-- 月次推移 -->
+      <div class="section" id="sectionTrend">
+        <div class="section-header" onclick="toggleSection('sectionTrend')">
+          <div class="bar"></div>
+          <span class="title">月別レビュー推移</span>
+          <span class="chevron"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </div>
+        <div class="section-body">
+          <div class="trend-chart-wrap" id="trendChart"></div>
+          <div class="trend-table-wrap"><table class="trend-table" id="trendTable"></table></div>
+        </div>
+      </div>
+
+      <!-- 2カラム：キーワード分析 ＋ 共起マップ -->
+      <div class="two-col">
+        <!-- 左：評価別キーワード -->
+        <div class="section" id="sectionKeyword">
+          <div class="section-header" onclick="toggleSection('sectionKeyword')">
+            <div class="bar"></div>
+            <span class="title">評価別キーワード分析</span>
+            <span class="chevron"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          </div>
+          <div class="section-body">
+            <div class="tab-bar" id="tabBar"></div>
+            <div id="tabContents"></div>
+          </div>
+        </div>
+
+        <!-- 右：共起ネットワークマップ（★タブと連動） -->
+        <div class="section" id="sectionCooccur">
+          <div class="section-header" onclick="toggleSection('sectionCooccur')">
+            <div class="bar"></div>
+            <span class="title">キーワード共起マップ</span>
+            <span class="chevron"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          </div>
+          <div class="section-body">
+            <p style="font-size:12px;color:var(--color-text-light);margin-bottom:12px">丸の大きさ＝出現頻度、線＝同じレビュー内での同時出現（★タブと連動）</p>
+            <div class="cooccurrence-map" id="cooccurrenceMap"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 改善提案 -->
+      <div class="section" id="sectionSuggest">
+        <div class="section-header" onclick="toggleSection('sectionSuggest')">
+          <div class="bar"></div>
+          <span class="title">データに基づく改善提案</span>
+          <span class="chevron"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </div>
+        <div class="section-body">
+          <ul class="suggestion-list" id="suggestionList"></ul>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer">レビュー分析ダッシュボード — ブラウザ完結型ツール</div>
+  </div>
+
+  <script>
+  // ======================================================
+  // ■ 設定エリア（★ カスタマイズはここ ★）
+  // ======================================================
+
+  /**
+   * 【注目キーワードリスト】
+   * レビュー本文から検索・カウントするキーワード一覧。
+   * 商品に合わせて自由に追加・削除してください。
+   */
+  const KEYWORDS = [
+    'サイズ','大きさ','フィット','ぴったり',
+    '吸水','吸収','漏れ','モレ',
+    'おりもの','おりものシート',
+    'レース','デザイン','見た目','かわいい','おしゃれ',
+    '洗濯','洗い','手洗い','乾き','速乾',
+    '肌触り','肌ざわり','柔らかい','やわらかい','素材',
+    '薄い','厚い','厚み','コンパクト',
+    '価格','値段','コスパ','お買い得','安い','高い',
+    'リピート','リピ','まとめ買い','セット',
+    '臭い','ニオイ','匂い','消臭',
+    '蒸れ','ムレ','通気',
+    '色','カラー','柄',
+    '配送','届いた','発送','梱包','包装',
+    'ズレ','ずれ','ヨレ'
+  ];
+
+  //
+  // 【商品名のプロモ文言除去パターン】
+  // 商品名の中からこの正規表現にマッチする部分を自動除去します。
+  // 配列で複数パターンを登録でき、上から順にすべて適用されます。
+  //
+  // ★ プロモ文言が変わったら、ここのパターンを追加・書き換えてください ★
+  //
+  // パターンの読み方：
+  //   1つ目 → 「MAX〜限定？」までを除去（？は全角半角どちらでもOK）
+  //   2つ目 → 「モモフル」を除去。ただし直後に「プラス」が続く場合はそのまま残す
+  //
+  const PRODUCT_NAME_REMOVE_PATTERNS = [
+    new RegExp('MAX.*?限定[？?]?\\s*', 'g'),
+    new RegExp('モモフル(?!プラス)\\s*', 'g'),
+  ];
+
+  /**
+   * 【改善案ルール】
+   * 低評価（★1〜2）で keyword が threshold 回以上出たら message を表示。
+   */
+  const SUGGESTION_RULES = [
+    {keyword:'サイズ',  threshold:3, message:'サイズ表の見直しや実寸画像の掲載を検討してください。'},
+    {keyword:'大きさ',  threshold:3, message:'サイズバリエーションの拡充やサイズ比較画像の掲載を検討しましょう。'},
+    {keyword:'漏れ',    threshold:2, message:'品質チェック体制の強化や、正しい使用方法ガイドの同梱を検討してください。'},
+    {keyword:'モレ',    threshold:2, message:'品質改善と「漏れにくい使い方」のアドバイス追記を検討しましょう。'},
+    {keyword:'肌触り',  threshold:2, message:'素材の見直しや敏感肌向けラインナップの追加を検討してください。'},
+    {keyword:'価格',    threshold:3, message:'まとめ買い割引やお試し価格の導入でお得感を演出しましょう。'},
+    {keyword:'配送',    threshold:2, message:'配送スピードや梱包品質の改善を物流パートナーと相談してください。'},
+    {keyword:'臭い',    threshold:2, message:'消臭加工や個包装の密閉性見直しを検討しましょう。'},
+    {keyword:'蒸れ',    threshold:2, message:'通気性の改善やメッシュ素材の採用を検討してください。'},
+    {keyword:'ズレ',    threshold:2, message:'滑り止め加工の改良や装着ガイドの追加を検討しましょう。'},
+    {keyword:'洗濯',    threshold:2, message:'お手入れ方法カードの同梱や洗濯ネット付きセット販売を検討してください。'},
+  ];
+
+  /**
+   * 【CSV列名の候補】
+   * CSVの列名が異なる場合、該当しそうな名前をここに追加してください。
+   */
+  const COLUMN_ALIASES = {
+    reviewText:  ['レビュー本文','レビューコメント','コメント','review_comment','review_text','レビュー内容','本文'],
+    rating:      ['評価','総合評価','レビュー評価','rating','点数','星','ショップ評価','商品評価'],
+    type:        ['レビュータイプ','レビュー種別','type','種別','区分'],
+    productName: ['商品名','商品タイトル','product_name','product_title','商品','タイトル','品名'],
+    reviewDate:  ['レビュー日','投稿日','レビュー投稿日','日付','date','review_date','投稿日時','レビュー日時','作成日'],
+  };
+
+
+  // ======================================================
+  // ■ グローバル変数
+  // ======================================================
+  let parsedData = [];
+  let colReview  = null;
+  let colRating  = null;
+  let colType    = null;
+  let colProduct = null;
+  let colDate    = null;
+
+
+  // ======================================================
+  // ■ DOM要素
+  // ======================================================
+  const uploadArea      = document.getElementById('uploadArea');
+  const csvInput        = document.getElementById('csvInput');
+  const dashboard       = document.getElementById('dashboard');
+  const productSelect   = document.getElementById('productSelect');
+  const productCount    = document.getElementById('productCount');
+  const summaryGrid     = document.getElementById('summaryGrid');
+  const tabBar          = document.getElementById('tabBar');
+  const tabContents     = document.getElementById('tabContents');
+  const cooccurrenceMap = document.getElementById('cooccurrenceMap');
+  const suggestionList  = document.getElementById('suggestionList');
+
+
+  // ======================================================
+  // ■ アップロード操作
+  // ======================================================
+  uploadArea.addEventListener('click', () => csvInput.click());
+  document.getElementById('headerUploadBtn').addEventListener('click', () => csvInput.click());
+  csvInput.addEventListener('change', e => { if(e.target.files.length) handleFile(e.target.files[0]); });
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault(); uploadArea.classList.remove('dragover');
+    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  /* 商品が切り替わったら再描画 */
+  productSelect.addEventListener('change', () => renderDashboard());
+
+
+  // ======================================================
+  // ■ ファイル読み込み
+  // ======================================================
+  function handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      parsedData = parseCSV(e.target.result);
+      if (!parsedData.length) { alert('CSVの解析結果が0件でした。文字コードを確認してください。'); return; }
+
+      uploadArea.querySelector('.label').textContent = `✅ ${file.name}（${parsedData.length}件）`;
+      uploadArea.querySelector('.hint').textContent = '別のファイルを読み込むにはもう一度クリック';
+      uploadArea.classList.add('loaded');
+      // ヘッダーのバッジを更新
+      var badge = document.getElementById('headerUploadBtn');
+      if (badge) { badge.textContent = '✅ ' + file.name; badge.style.color = 'var(--color-positive)'; badge.style.borderColor = 'var(--color-positive)'; }
+
+      // 列名を自動検出
+      const sample = parsedData[0];
+      colReview  = findColumn(sample, 'reviewText');
+      colRating  = findColumn(sample, 'rating');
+      colType    = findColumn(sample, 'type');
+      colProduct = findColumn(sample, 'productName');
+      colDate    = findColumn(sample, 'reviewDate');
+
+      // 日付列フォールバック（日付っぽい値が多い列を探す）
+      // ※ 年が1900〜2099の範囲内であることをチェック
+      if (!colDate) {
+        let bs = 0;
+        const dateRe = /(19|20)\d{2}[\/\-年]\d{1,2}/;
+        Object.keys(sample).forEach(k => {
+          const s = parsedData.filter(r => dateRe.test(r[k] || '')).length;
+          if (s > bs) { bs = s; colDate = k; }
+        });
+        // さらに見つからなければ YYYYMMDD 形式（8桁数字）を探す
+        if (!bs) {
+          Object.keys(sample).forEach(k => {
+            const s = parsedData.filter(r => /^(19|20)\d{6}/.test((r[k]||'').trim())).length;
+            if (s > bs) { bs = s; colDate = k; }
+          });
+        }
+      }
+
+      // レビュー本文フォールバック（一番文字数が多い列）
+      if (!colReview) {
+        let mx = 0;
+        Object.keys(sample).forEach(k => {
+          const t = parsedData.reduce((s, r) => s + (r[k] || '').length, 0);
+          if (t > mx) { mx = t; colReview = k; }
+        });
+      }
+      // 評価点フォールバック（1〜5の数値が多い列）
+      if (!colRating) {
+        let bs = 0;
+        Object.keys(sample).forEach(k => {
+          const s = parsedData.filter(r => { const v = parseFloat(r[k]); return v >= 1 && v <= 5; }).length;
+          if (s > bs) { bs = s; colRating = k; }
+        });
+      }
+
+      buildProductSelector();
+      renderGlobalSummary();
+      dashboard.classList.add('visible');
+      renderDashboard();
+      dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    // ★ 文字化けする場合は 'Shift_JIS' → 'UTF-8' に変更
+    reader.readAsText(file, 'Shift_JIS');
+  }
+
+
+  // ======================================================
+  // ■ 商品セレクターを構築
+  // ======================================================
+
+  /**
+   * 商品名からプロモ文言を除去して表示用の名前を返す関数
+   * PRODUCT_NAME_REMOVE_PATTERN にマッチした部分を除去し、
+   * 残った先頭の記号・空白も整理します。
+   */
+  function shortProductName(name) {
+    let short = name;
+    // 登録された除去パターンを順番に適用
+    PRODUCT_NAME_REMOVE_PATTERNS.forEach(pat => { short = short.replace(pat, ''); });
+    // 除去後の先頭にある空白・記号を整理（？?も含む）
+    short = short.replace(/^[\s？?！!《》【】「」\-_・:：]+/, '').trim();
+    // 除去後が空になってしまった場合は元の名前を返す
+    return short || name;
+  }
+
+  function buildProductSelector() {
+    productSelect.innerHTML = '<option value="__ALL__">すべての商品</option>';
+    if (!colProduct) {
+      productSelect.disabled = true;
+      productCount.textContent = '（商品名列が見つかりません）';
+      return;
+    }
+    productSelect.disabled = false;
+    const names = [...new Set(parsedData.map(r => (r[colProduct] || '').trim()).filter(Boolean))];
+    names.sort();
+
+    names.forEach(name => {
+      const cnt = parsedData.filter(r => (r[colProduct] || '').trim() === name).length;
+      const opt = document.createElement('option');
+      opt.value = name;  // valueは元の商品名のまま（フィルタリング用）
+      const display = shortProductName(name);
+      const truncated = display.length > 50 ? display.slice(0, 50) + '…' : display;
+      opt.textContent = `${truncated}（${cnt}件）`;
+      productSelect.appendChild(opt);
+    });
+    productCount.textContent = `${names.length} 商品`;
+  }
+
+
+  // ======================================================
+  // ■ 店舗全体・商品全体サマリーの描画（CSV読み込み時に1回だけ実行）
+  // ======================================================
+  function renderGlobalSummary() {
+    const globalSummary = document.getElementById('globalSummary');
+    const dataPeriod = document.getElementById('dataPeriod');
+    const avg = a => a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : '—';
+
+    // --- 対象期間を算出（日付列から最古〜最新を取得） ---
+    if (colDate) {
+      const yearMonths = [];
+      parsedData.forEach(r => {
+        const dateStr = (r[colDate] || '').trim();
+        const m1 = dateStr.match(/((?:19|20)\d{2})[\/\-年](\d{1,2})/);
+        if (m1) { yearMonths.push(`${m1[1]}-${m1[2].padStart(2,'0')}`); return; }
+        const m2 = dateStr.match(/^((?:19|20)\d{2})(\d{2})(\d{2})/);
+        if (m2) { yearMonths.push(`${m2[1]}-${m2[2]}`); return; }
+        if (/^\d{5}$/.test(dateStr)) {
+          const d = new Date((parseInt(dateStr)-25569)*86400000);
+          if (d.getFullYear()>=1900 && d.getFullYear()<=2099) yearMonths.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+        }
+      });
+      if (yearMonths.length) {
+        yearMonths.sort();
+        const oldest = yearMonths[0].replace('-','/');
+        const newest = yearMonths[yearMonths.length-1].replace('-','/');
+        dataPeriod.style.display = 'flex';
+        dataPeriod.innerHTML = `
+          <span class="period-icon">📅</span>
+          <span class="period-label">データ対象期間：</span>
+          <span class="period-value">${oldest} 〜 ${newest}</span>
+          <span style="color:var(--color-text-light);font-size:12px;margin-left:4px">（${yearMonths.length} 件のレビュー）</span>`;
+      }
+    }
+
+    let shopRatings = [];
+    let prodRatings = [];
+
+    if (colType) {
+      // type列がある場合：ショップと商品を分類
+      parsedData.forEach(r => {
+        const v = parseFloat(r[colRating]); if (isNaN(v) || v < 1 || v > 5) return;
+        const t = (r[colType] || '').toLowerCase();
+        if (t.includes('ショップ') || t.includes('shop')) shopRatings.push(v);
+        else prodRatings.push(v);
+      });
+    } else {
+      // type列がない場合：全件を商品レビューとして扱う
+      parsedData.forEach(r => {
+        const v = parseFloat(r[colRating]);
+        if (v >= 1 && v <= 5) prodRatings.push(v);
+      });
+    }
+
+    const shopAvg = avg(shopRatings);
+    const prodAvg = avg(prodRatings);
+
+    globalSummary.innerHTML = `
+      <div class="global-card">
+        <div class="gc-icon shop">🏪</div>
+        <div>
+          <div class="gc-label">ショップレビュー 全体</div>
+          <div class="gc-score">${shopRatings.length ? shopAvg : '—'}</div>
+          <div class="gc-detail">${shopRatings.length ? mkStars(parseFloat(shopAvg)) + `　${shopRatings.length} 件` : 'ショップレビューが見つかりません'}</div>
+        </div>
+      </div>
+      <div class="global-card">
+        <div class="gc-icon product">🛒</div>
+        <div>
+          <div class="gc-label">商品レビュー 全体</div>
+          <div class="gc-score">${prodRatings.length ? prodAvg : '—'}</div>
+          <div class="gc-detail">${prodRatings.length ? mkStars(parseFloat(prodAvg)) + `　${prodRatings.length} 件` : '商品レビューが見つかりません'}</div>
+        </div>
+      </div>`;
+  }
+
+
+  // ======================================================
+  // ■ セクション折りたたみ
+  // ======================================================
+  function toggleSection(id) {
+    document.getElementById(id).classList.toggle('collapsed');
+  }
+
+
+  // ======================================================
+  // ■ ダッシュボード描画（メイン）
+  // ======================================================
+  function renderDashboard() {
+    /* 選択中の商品でフィルタリング */
+    const selected = productSelect.value;
+    const data = selected === '__ALL__'
+      ? parsedData
+      : parsedData.filter(r => (r[colProduct] || '').trim() === selected);
+
+    // --- ① サマリー ---
+    const allRatings = data.map(r => parseFloat(r[colRating])).filter(v => v >= 1 && v <= 5);
+    let shopR = [], prodR = [];
+    if (colType) {
+      data.forEach(r => {
+        const v = parseFloat(r[colRating]); if (isNaN(v)) return;
+        const t = (r[colType] || '').toLowerCase();
+        if (t.includes('ショップ') || t.includes('shop')) shopR.push(v); else prodR.push(v);
+      });
+    }
+    if (!prodR.length && !shopR.length) prodR = allRatings;
+
+    const avg = a => a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : '—';
+    const dist = [0, 0, 0, 0, 0];
+    allRatings.forEach(v => { const i = Math.round(v) - 1; if (i >= 0 && i <= 4) dist[i]++; });
+
+    summaryGrid.innerHTML = '';
+    summaryGrid.innerHTML += card('📋', '総件数', `${allRatings.length}件`, '');
+    const avgAll = avg(allRatings);
+    summaryGrid.innerHTML += card('⭐', '平均評価', avgAll, mkStars(parseFloat(avgAll)));
+    if (prodR.length) summaryGrid.innerHTML += card('🛒', `商品（${prodR.length}件）`, avg(prodR), mkStars(parseFloat(avg(prodR))));
+    if (shopR.length) summaryGrid.innerHTML += card('🏪', `ショップ（${shopR.length}件）`, avg(shopR), mkStars(parseFloat(avg(shopR))));
+    const total = allRatings.length || 1;
+    const pct = i => Math.round(dist[i] / total * 100);
+    summaryGrid.innerHTML += card('📊', '分布', '',
+      `★5:${dist[4]}(${pct(4)}%)　★4:${dist[3]}(${pct(3)}%)<br>★3:${dist[2]}(${pct(2)}%)　★2:${dist[1]}(${pct(1)}%)<br>★1:${dist[0]}(${pct(0)}%)`);
+
+    // --- 月次推移 ---
+    renderMonthlyTrend(data);
+
+    // --- ② 評価別キーワード ---
+    const groups = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    data.forEach(r => {
+      const v = Math.round(parseFloat(r[colRating]));
+      const t = r[colReview] || '';
+      if (v >= 1 && v <= 5 && t) groups[v].push(t);
+    });
+
+    tabBar.innerHTML = '';
+    tabContents.innerHTML = '';
+    for (let s = 5; s >= 1; s--) {
+      const revs = groups[s], act = s === 5 ? 'active' : '';
+      tabBar.innerHTML += `<button class="tab-btn ${act}" data-star="${s}">★${s}（${revs.length}）</button>`;
+      const kw = countKeywords(revs);
+      let h = `<div class="tab-content ${act}" id="tab-${s}">`;
+      if (!kw.length) { h += '<div class="empty-msg">該当キーワードなし</div>'; }
+      else {
+        const mx = kw[0].count;
+        h += '<ul class="keyword-list">';
+        kw.slice(0, 10).forEach((k, i) => {
+          const p = Math.round(k.count / mx * 100);
+          h += `<li class="keyword-item">
+            <span class="keyword-rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
+            <span class="keyword-name">${esc(k.keyword)}</span>
+            <div class="keyword-bar-wrap"><div class="keyword-bar" style="width:${p}%"></div></div>
+            <span class="keyword-count">${k.count}回</span></li>`;
+        });
+        h += '</ul>';
+      }
+      h += '</div>';
+      tabContents.innerHTML += h;
+    }
+    tabBar.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+      tabBar.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+      tabContents.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById(`tab-${b.dataset.star}`).classList.add('active');
+      // ★ タブ切り替え時に共起マップも連動して再描画
+      renderCooccurrence(groups[b.dataset.star] || []);
+    }));
+
+    // --- ③ 共起マップ（初期表示は★5のレビューで計算） ---
+    renderCooccurrence(groups[5]);
+
+    // --- ④ 改善提案 ---
+    const lowRevs = [...groups[1], ...groups[2]];
+    const lowKw = {}; countKeywords(lowRevs).forEach(k => { lowKw[k.keyword] = k.count; });
+    suggestionList.innerHTML = '';
+    let has = false;
+    SUGGESTION_RULES.forEach(r => {
+      const c = lowKw[r.keyword] || 0;
+      if (c >= r.threshold) {
+        has = true;
+        suggestionList.innerHTML += `<li class="suggestion-item"><span class="badge">⚠️</span><div><strong>「${esc(r.keyword)}」が低評価で${c}回出現</strong><br>${esc(r.message)}</div></li>`;
+      }
+    });
+    const highRevs = [...groups[4], ...groups[5]];
+    const highKw = countKeywords(highRevs);
+    if (highKw.length) {
+      const top3 = highKw.slice(0, 3).map(k => k.keyword).join('、');
+      suggestionList.innerHTML += `<li class="suggestion-item" style="border-left-color:var(--color-positive)"><span class="badge">✅</span><div><strong>高評価キーワード：${esc(top3)}</strong><br>商品の強みです。商品ページやSNSで積極的にアピールしましょう。</div></li>`;
+    }
+    if (!has && !highKw.length) suggestionList.innerHTML = '<div class="empty-msg">改善提案を生成するデータが不足しています</div>';
+  }
+
+
+  // ======================================================
+  // ■ ユーティリティ関数
+  // ======================================================
+
+  /**
+   * 共起ネットワークマップ（Force-Directed Graph）
+   * 力学シミュレーションでキーワードの関連性をバブル＋線で可視化する関数
+   *
+   * ・丸の大きさ ＝ キーワードの出現回数
+   * ・線の太さ   ＝ 同時出現回数（共起の強さ）
+   * ・丸の距離   ＝ 共起が多いほど近くに配置
+   */
+  function renderCooccurrence(reviewTexts) {
+    const container = document.getElementById('cooccurrenceMap');
+    container.innerHTML = '';
+
+    // キーワード出現回数を取得
+    const kwCounts = countKeywords(reviewTexts);
+    if (!kwCounts.length) { container.innerHTML = '<div class="empty-msg">共起キーワードなし</div>'; return; }
+
+    // 共起ペアを取得
+    const pairs = calcCooccurrence(reviewTexts);
+    if (!pairs.length) { container.innerHTML = '<div class="empty-msg">共起キーワードなし</div>'; return; }
+
+    // --- ノード（丸）の生成 ---
+    // 共起ペアに登場するキーワードだけをノードにする
+    const kwInPairs = new Set();
+    pairs.slice(0, 40).forEach(p => { kwInPairs.add(p.a); kwInPairs.add(p.b); });
+
+    const kwMap = {};
+    kwCounts.forEach(k => { kwMap[k.keyword] = k.count; });
+
+    // SVGの実サイズ（viewBox基準）
+    const W = 700, H = 450;
+    const cx = W / 2, cy = H / 2;
+
+    const nodes = [...kwInPairs].map((name, i) => ({
+      id: i, name,
+      count: kwMap[name] || 1,
+      x: cx + (Math.random() - 0.5) * W * 0.5,
+      y: cy + (Math.random() - 0.5) * H * 0.5,
+      vx: 0, vy: 0
+    }));
+
+    // ノード半径（出現回数に比例、最小6 最大28 ← 小さめにして重なりを減らす）
+    const maxCount = Math.max(...nodes.map(n => n.count), 1);
+    nodes.forEach(n => { n.r = 6 + (n.count / maxCount) * 22; });
+
+    // --- リンク（線）の生成 ---
+    const nameToIdx = {};
+    nodes.forEach(n => { nameToIdx[n.name] = n.id; });
+
+    const links = pairs.slice(0, 40)
+      .map(p => ({ s: nameToIdx[p.a], t: nameToIdx[p.b], count: p.count }))
+      .filter(l => l.s !== undefined && l.t !== undefined);
+
+    const maxLink = Math.max(...links.map(l => l.count), 1);
+
+    // --- 力学シミュレーション ---
+    const ITERATIONS = 350;            // シミュレーション回数（多いほど安定）
+    const REPULSION = 6000;            // ノード同士の反発力（大きく）
+    const LINK_STRENGTH = 0.025;       // リンクの引力強度（弱めに）
+    const LINK_DISTANCE = 120;         // リンクの理想距離（長めに）
+    const GRAVITY = 0.012;             // 中心への引力
+    const DAMPING = 0.82;              // 減衰
+
+    for (let iter = 0; iter < ITERATIONS; iter++) {
+      const alpha = 1 - iter / ITERATIONS;
+
+      // ① 全ノード間の反発力（クーロン力）
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          let dx = nodes[j].x - nodes[i].x;
+          let dy = nodes[j].y - nodes[i].y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          // ノード同士の最低距離 = 半径合計 + テキスト分の余白
+          const minDist = nodes[i].r + nodes[j].r + 30;
+          // 近すぎる場合は強い反発を与える
+          const effective = Math.max(dist, 1);
+          let force = REPULSION * alpha / (effective * effective);
+          if (dist < minDist) force *= 3;  // 重なり時はブースト
+          const fx = (dx / effective) * force;
+          const fy = (dy / effective) * force;
+          nodes[i].vx -= fx; nodes[i].vy -= fy;
+          nodes[j].vx += fx; nodes[j].vy += fy;
+        }
+      }
+
+      // ② リンクの引力（バネ力）
+      links.forEach(l => {
+        const a = nodes[l.s], b = nodes[l.t];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const idealDist = LINK_DISTANCE * (1 - (l.count / maxLink) * 0.3);
+        const force = (dist - idealDist) * LINK_STRENGTH * alpha;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        a.vx += fx; a.vy += fy;
+        b.vx -= fx; b.vy -= fy;
+      });
+
+      // ③ 中心への引力
+      nodes.forEach(n => {
+        n.vx += (cx - n.x) * GRAVITY * alpha;
+        n.vy += (cy - n.y) * GRAVITY * alpha;
+      });
+
+      // ④ 速度を適用して位置を更新
+      nodes.forEach(n => {
+        n.vx *= DAMPING;
+        n.vy *= DAMPING;
+        n.x += n.vx;
+        n.y += n.vy;
+        n.x = Math.max(n.r + 4, Math.min(W - n.r - 4, n.x));
+        n.y = Math.max(n.r + 4, Math.min(H - n.r - 4, n.y));
+      });
+    }
+
+    // ⑤ 最終の重なり解消パス（シミュレーション後に残った重なりを物理的に押し出す）
+    for (let pass = 0; pass < 30; pass++) {
+      let moved = false;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          let dx = nodes[j].x - nodes[i].x;
+          let dy = nodes[j].y - nodes[i].y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+          const minDist = nodes[i].r + nodes[j].r + 16;
+          if (dist < minDist) {
+            moved = true;
+            const overlap = (minDist - dist) / 2 + 1;
+            const ox = (dx / dist) * overlap;
+            const oy = (dy / dist) * overlap;
+            nodes[i].x -= ox; nodes[i].y -= oy;
+            nodes[j].x += ox; nodes[j].y += oy;
+          }
+        }
+      }
+      // 境界内に収める
+      nodes.forEach(n => {
+        n.x = Math.max(n.r + 4, Math.min(W - n.r - 4, n.x));
+        n.y = Math.max(n.r + 4, Math.min(H - n.r - 4, n.y));
+      });
+      if (!moved) break;
+    }
+
+    // --- SVG描画 ---
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('xmlns', NS);
+
+    // リンク（線）を描画
+    links.forEach(l => {
+      const a = nodes[l.s], b = nodes[l.t];
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+      // 共起数に応じて太さ・透明度を変える
+      const thickness = 1 + (l.count / maxLink) * 3.5;
+      const opacity = 0.15 + (l.count / maxLink) * 0.35;
+      line.setAttribute('stroke', '#8E8E93');
+      line.setAttribute('stroke-width', thickness);
+      line.setAttribute('stroke-opacity', opacity);
+      line.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(line);
+    });
+
+    // ノード（丸＋テキスト）を描画
+    // カラフルなパレット（バブルの色バリエーション）
+    const NODE_COLORS = [
+      {fill:'rgba(219, 68, 103, 0.18)', stroke:'rgba(219, 68, 103, 0.50)', text:'#C0334D'},  // ピンク
+      {fill:'rgba(26, 91, 142, 0.18)',  stroke:'rgba(26, 91, 142, 0.50)',  text:'#1A5B8E'},   // 青
+      {fill:'rgba(142, 68, 173, 0.18)', stroke:'rgba(142, 68, 173, 0.50)', text:'#7D3C98'},   // 紫
+      {fill:'rgba(39, 174, 96, 0.18)',  stroke:'rgba(39, 174, 96, 0.50)',  text:'#1E8449'},   // 緑
+      {fill:'rgba(230, 126, 34, 0.18)', stroke:'rgba(230, 126, 34, 0.50)', text:'#CA6F1E'},   // オレンジ
+      {fill:'rgba(41, 128, 185, 0.18)', stroke:'rgba(41, 128, 185, 0.50)', text:'#2471A3'},   // 水色
+      {fill:'rgba(192, 57, 43, 0.18)',  stroke:'rgba(192, 57, 43, 0.50)',  text:'#C0392B'},   // 赤
+      {fill:'rgba(22, 160, 133, 0.18)', stroke:'rgba(22, 160, 133, 0.50)', text:'#148F77'},   // ティール
+    ];
+    nodes.forEach((n, ni) => {
+      const g = document.createElementNS(NS, 'g');
+      const col = NODE_COLORS[ni % NODE_COLORS.length];
+
+      // 出現頻度に応じて透明度を上げる
+      const ratio = n.count / maxCount;
+      const boost = 1 + ratio * 1.2;  // 頻度が高いほど濃く
+
+      // 丸（バブル）
+      const circle = document.createElementNS(NS, 'circle');
+      circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y);
+      circle.setAttribute('r', n.r);
+      circle.setAttribute('fill', col.fill.replace('0.18', (0.15 + ratio * 0.25).toFixed(2)));
+      circle.setAttribute('stroke', col.stroke.replace('0.50', (0.35 + ratio * 0.40).toFixed(2)));
+      circle.setAttribute('stroke-width', '1.5');
+      g.appendChild(circle);
+
+      // キーワードテキスト（白い縁取り付きで読みやすく）
+      const fontSize = Math.max(8, Math.min(12, n.r * 0.5));
+
+      // 縁取り用（白い太めのストローク）
+      const textBg = document.createElementNS(NS, 'text');
+      textBg.setAttribute('x', n.x); textBg.setAttribute('y', n.y);
+      textBg.setAttribute('text-anchor', 'middle');
+      textBg.setAttribute('dominant-baseline', 'central');
+      textBg.setAttribute('font-size', fontSize);
+      textBg.setAttribute('font-weight', '600');
+      textBg.setAttribute('fill', 'none');
+      textBg.setAttribute('stroke', '#fff');
+      textBg.setAttribute('stroke-width', '3');
+      textBg.setAttribute('stroke-linejoin', 'round');
+      textBg.textContent = n.name;
+      g.appendChild(textBg);
+
+      // 本体テキスト
+      const text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', n.x); text.setAttribute('y', n.y);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'central');
+      text.setAttribute('font-size', fontSize);
+      text.setAttribute('font-weight', '600');
+      text.setAttribute('fill', col.text);
+      text.textContent = n.name;
+      g.appendChild(text);
+
+      // 出現回数（丸の右上に小さく表示）
+      if (n.r >= 14) {
+        const countText = document.createElementNS(NS, 'text');
+        countText.setAttribute('x', n.x); countText.setAttribute('y', n.y + fontSize * 0.7 + 2);
+        countText.setAttribute('text-anchor', 'middle');
+        countText.setAttribute('font-size', '8');
+        countText.setAttribute('fill', col.stroke);
+        countText.textContent = n.count + '回';
+        g.appendChild(countText);
+      }
+
+      svg.appendChild(g);
+    });
+
+    container.appendChild(svg);
+  }
+
+  /**
+   * 月別レビュー推移を描画する関数
+   * SVG折れ線グラフ（平均評価＋件数）とデータテーブルを生成
+   */
+  function renderMonthlyTrend(data) {
+    const trendChart = document.getElementById('trendChart');
+    const trendTable = document.getElementById('trendTable');
+
+    if (!colDate) {
+      trendChart.innerHTML = '';
+      trendTable.innerHTML = '<tr><td class="empty-msg">日付列が見つかりません</td></tr>';
+      return;
+    }
+
+    // 各レビューから年月を抽出してグループ化
+    const monthMap = {};
+    data.forEach(r => {
+      const dateStr = (r[colDate] || '').trim();
+      let year, month;
+
+      // パターン1:「2024/03/15」「2024-03-15」「2024年3月15日」
+      const m1 = dateStr.match(/((?:19|20)\d{2})[\/\-年](\d{1,2})/);
+      if (m1) { year = m1[1]; month = m1[2]; }
+
+      // パターン2: YYYYMMDD（8桁数字）
+      if (!year) {
+        const m2 = dateStr.match(/^((?:19|20)\d{2})(\d{2})(\d{2})/);
+        if (m2) { year = m2[1]; month = m2[2]; }
+      }
+
+      // パターン3: Excelシリアル値（数値のみ、25569=1970/1/1）
+      if (!year && /^\d{5}$/.test(dateStr)) {
+        const d = new Date((parseInt(dateStr) - 25569) * 86400000);
+        if (d.getFullYear() >= 1900 && d.getFullYear() <= 2099) {
+          year = String(d.getFullYear());
+          month = String(d.getMonth() + 1);
+        }
+      }
+
+      if (!year) return;
+      const key = `${year}-${month.padStart(2, '0')}`;
+      const rating = parseFloat(r[colRating]);
+      if (!monthMap[key]) monthMap[key] = { ratings: [], count: 0 };
+      monthMap[key].count++;
+      if (rating >= 1 && rating <= 5) monthMap[key].ratings.push(rating);
+    });
+
+    const months = Object.keys(monthMap).sort();
+    if (months.length === 0) {
+      trendChart.innerHTML = '';
+      trendTable.innerHTML = '<tr><td class="empty-msg">日付データが不足しています</td></tr>';
+      return;
+    }
+
+    // 月ごとの平均評価と件数を算出
+    const points = months.map(key => {
+      const d = monthMap[key];
+      const avg = d.ratings.length ? (d.ratings.reduce((a, b) => a + b, 0) / d.ratings.length) : 0;
+      const label = key.replace('-', '/');  // "2024/03"
+      return { key, label, avg: Math.round(avg * 100) / 100, count: d.count };
+    });
+
+    // --- SVG折れ線グラフの描画 ---
+    const W = 700, H = 220, padL = 44, padR = 44, padT = 28, padB = 40;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const n = points.length;
+
+    // 評価軸（左Y）: 1〜5 固定
+    const yMin = 1, yMax = 5;
+    const toY = v => padT + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
+
+    // 件数軸（右Y）: 0〜最大件数
+    const maxCount = Math.max(...points.map(p => p.count), 1);
+    const countCeil = Math.ceil(maxCount / 5) * 5 || 5;
+    const toYc = v => padT + chartH - (v / countCeil) * chartH;
+
+    // X座標
+    const toX = i => padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
+
+    // 評価の折れ線パス
+    const avgPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.avg).toFixed(1)}`).join(' ');
+    // 件数の折れ線パス
+    const cntPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toYc(p.count).toFixed(1)}`).join(' ');
+
+    // X軸ラベル（多い場合は間引き）
+    const labelStep = Math.max(1, Math.ceil(n / 12));
+    let xLabels = '';
+    points.forEach((p, i) => {
+      if (i % labelStep === 0 || i === n - 1) {
+        xLabels += `<text x="${toX(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#6B7C93">${p.label}</text>`;
+      }
+    });
+
+    // Y軸ラベル（評価 左）
+    let yLabelsL = '';
+    for (let v = 1; v <= 5; v++) {
+      yLabelsL += `<text x="${padL - 6}" y="${toY(v) + 3}" text-anchor="end" font-size="10" fill="#6B7C93">${v}</text>`;
+      yLabelsL += `<line x1="${padL}" y1="${toY(v)}" x2="${padL + chartW}" y2="${toY(v)}" stroke="#E1E5EB" stroke-dasharray="3,3"/>`;
+    }
+
+    // Y軸ラベル（件数 右）
+    let yLabelsR = '';
+    const cStep = Math.max(1, Math.ceil(countCeil / 4));
+    for (let v = 0; v <= countCeil; v += cStep) {
+      yLabelsR += `<text x="${W - padR + 6}" y="${toYc(v) + 3}" text-anchor="start" font-size="10" fill="#27AE60">${v}</text>`;
+    }
+
+    // ドットとツールチップ用の円
+    let avgDots = '', cntDots = '';
+    points.forEach((p, i) => {
+      avgDots += `<circle cx="${toX(i)}" cy="${toY(p.avg)}" r="3.5" fill="#1A5B8E" stroke="#fff" stroke-width="1.5"/>`;
+      cntDots += `<circle cx="${toX(i)}" cy="${toYc(p.count)}" r="3.5" fill="#27AE60" stroke="#fff" stroke-width="1.5"/>`;
+    });
+
+    trendChart.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="font-family:inherit">
+        ${yLabelsL}${yLabelsR}${xLabels}
+        <!-- 件数（緑） -->
+        <path d="${cntPath}" fill="none" stroke="#27AE60" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+        ${cntDots}
+        <!-- 評価（青） -->
+        <path d="${avgPath}" fill="none" stroke="#1A5B8E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${avgDots}
+        <!-- 凡例 -->
+        <circle cx="${padL + 8}" cy="12" r="4" fill="#1A5B8E"/><text x="${padL + 16}" y="15" font-size="11" fill="#2C3E50">平均評価（左軸）</text>
+        <circle cx="${padL + 120}" cy="12" r="4" fill="#27AE60"/><text x="${padL + 128}" y="15" font-size="11" fill="#2C3E50">件数（右軸）</text>
+      </svg>`;
+
+    // --- データテーブル ---
+    let rows = '<thead><tr><th>年月</th><th>件数</th><th>平均評価</th><th>★5</th><th>★4</th><th>★3</th><th>★2</th><th>★1</th></tr></thead><tbody>';
+    // 新しい月を上に表示
+    [...points].reverse().forEach(p => {
+      // 各月の評価分布を計算
+      const d = monthMap[p.key];
+      const dist = [0, 0, 0, 0, 0];
+      d.ratings.forEach(v => { const i = Math.round(v) - 1; if (i >= 0 && i <= 4) dist[i]++; });
+      rows += `<tr>
+        <td style="font-weight:600">${p.label}</td>
+        <td>${p.count}</td>
+        <td style="font-weight:700;color:var(--color-primary)">${p.avg}</td>
+        <td>${dist[4]}</td><td>${dist[3]}</td><td>${dist[2]}</td><td>${dist[1]}</td><td>${dist[0]}</td>
+      </tr>`;
+    });
+    rows += '</tbody>';
+    trendTable.innerHTML = rows;
+  }
+
+  /* キーワード出現回数カウント */
+  function countKeywords(texts) {
+    const c = {}; KEYWORDS.forEach(k => { c[k] = 0; });
+    texts.forEach(t => {
+      const lo = t.toLowerCase();
+      KEYWORDS.forEach(k => {
+        const kl = k.toLowerCase(); let p = 0;
+        while ((p = lo.indexOf(kl, p)) !== -1) { c[k]++; p += kl.length; }
+      });
+    });
+    return Object.entries(c).filter(([_, v]) => v > 0).map(([keyword, count]) => ({ keyword, count })).sort((a, b) => b.count - a.count);
+  }
+
+  /* 共起分析 */
+  function calcCooccurrence(texts) {
+    const pc = {};
+    texts.forEach(t => {
+      if (!t) return; const lo = t.toLowerCase();
+      const f = KEYWORDS.filter(k => lo.includes(k.toLowerCase()));
+      for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) {
+        const p = [f[i], f[j]].sort().join('|');
+        pc[p] = (pc[p] || 0) + 1;
+      }
+    });
+    return Object.entries(pc).map(([p, c]) => { const [a, b] = p.split('|'); return { a, b, count: c }; }).filter(x => x.count >= 2).sort((a, b) => b.count - a.count);
+  }
+
+  /* ★表示 */
+  function mkStars(v) { if (isNaN(v)) return ''; const f = Math.floor(v), h = v - f >= .5 ? 1 : 0; return `<span class="stars">${'★'.repeat(f)}${h ? '☆' : ''}${'☆'.repeat(5 - f - h)}</span>`; }
+
+  /* サマリーカード */
+  function card(icon, label, value, sub) {
+    return `<div class="summary-card"><div class="ic">${icon}</div><div><div class="info-label">${esc(label)}</div><div class="info-value">${value || ''}</div><div class="info-sub">${sub || ''}</div></div></div>`;
+  }
+
+  /* HTMLエスケープ */
+  function esc(s) { return s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''; }
+
+  /* 列名検出 */
+  function findColumn(row, key) {
+    const a = COLUMN_ALIASES[key] || [];
+    for (const al of a) if (row.hasOwnProperty(al)) return al;
+    const ks = Object.keys(row);
+    for (const al of a) { const f = ks.find(k => k.includes(al) || al.includes(k)); if (f) return f; }
+    return null;
+  }
+
+  // ======================================================
+  // ■ CSV解析
+  // ======================================================
+  function parseCSV(text) {
+    const lines = []; let cur = '', inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '"') { if (inQ && text[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if ((ch === '\n' || ch === '\r') && !inQ) { if (cur.trim()) lines.push(cur); cur = ''; if (ch === '\r' && text[i + 1] === '\n') i++; }
+      else cur += ch;
+    }
+    if (cur.trim()) lines.push(cur);
+    if (lines.length < 2) return [];
+    const hdr = splitLine(lines[0]);
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = splitLine(lines[i]), obj = {};
+      hdr.forEach((h, idx) => { obj[h.trim()] = (vals[idx] || '').trim(); });
+      rows.push(obj);
+    }
+    return rows;
+  }
+  function splitLine(line) {
+    const r = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (ch === ',' && !inQ) { r.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    r.push(cur); return r;
+  }
+  </script>
+</body>
+</html>
