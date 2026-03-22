@@ -1,4 +1,4 @@
-<!-- review-dashboard v2 | updated: 2026-03-22b -->
+<!-- review-dashboard v2 | updated: 2026-03-22c | Yahoo!ショッピングCSV対応 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -236,7 +236,7 @@
         <div class="bar"></div>
         <div class="title-text">
           <h1>レビュー分析ダッシュボード</h1>
-          <span class="subtitle">CSVから商品の強みと弱みを明確化します。</span>
+          <span class="subtitle">楽天市場とYahoo!ショッピングのCSVから商品の強みと弱みを明確化します。</span>
         </div>
       </div>
       <div class="upload-badge" id="headerUploadBtn">● CSVをアップロードしてください</div>
@@ -248,11 +248,11 @@
     <div class="upload-area" id="uploadArea">
       <div class="icon">📁</div>
       <div class="label">CSVファイルをここにドラッグ＆ドロップ（複数可）</div>
-      <div class="hint">または、クリックしてファイルを選択（Ctrl/Cmd+クリックで複数選択）</div>
-      <div class="guide" style="margin-top:12px;font-size:12px;color:#6B7C93;line-height:1.7;text-align:left;max-width:520px">
+      <div class="guide" style="margin-top:12px;font-size:12px;color:#6B7C93;line-height:1.7;text-align:left;max-width:560px">
         📌 <strong>CSVの取得方法：</strong><br>
-        RMS ＞ コミュニティ ＞ レビューチェックツール ＞ そのまま何も触らずにCSVダウンロード<br>
-        <span style="font-size:11px;color:#8E8E93">（全期間の商品・ショップ両方のレビューが取得されます。3000件超の場合は複数ファイルをまとめて選択できます）</span>
+        <strong>楽天：</strong>RMS ＞ コミュニティ ＞ レビューチェックツール ＞ そのままCSVダウンロード<br>
+        <strong>Yahoo!：</strong>ストアクリエイターPro ＞ 評価 ＞ 商品レビューチェックツール ＞ CSVダウンロード<br>
+        <span style="font-size:11px;color:#8E8E93">※ Yahoo!はZipファイルでダウンロードされます。解凍・展開してからCSVをアップロードしてください</span>
       </div>
       <input type="file" id="csvInput" accept=".csv,.txt" multiple>
     </div>
@@ -427,11 +427,11 @@
    * CSVの列名が異なる場合、該当しそうな名前をここに追加してください。
    */
   const COLUMN_ALIASES = {
-    reviewText:  ['レビュー本文','レビューコメント','コメント','review_comment','review_text','レビュー内容','本文'],
-    rating:      ['評価','総合評価','レビュー評価','rating','点数','星','ショップ評価','商品評価'],
+    reviewText:  ['レビュー本文','レビューコメント','コメント内容','コメント','review_comment','review_text','レビュー内容','本文'],
+    rating:      ['評価点数','評価','総合評価','レビュー評価','rating','点数','星','ショップ評価','商品評価'],
     type:        ['レビュータイプ','レビュー種別','type','種別','区分'],
     productName: ['商品名','商品タイトル','product_name','product_title','商品','タイトル','品名'],
-    reviewDate:  ['レビュー日','投稿日','レビュー投稿日','日付','date','review_date','投稿日時','レビュー日時','作成日'],
+    reviewDate:  ['レビュー日','投稿日','レビュー投稿日','日付','評価日','date','review_date','投稿日時','レビュー日時','作成日'],
   };
 
 
@@ -502,7 +502,7 @@
    */
   function makeRowKey(row) {
     // まずレビューIDっぽい列を探す
-    const idAliases = ['レビューID','review_id','ID','id','No','no','番号'];
+    const idAliases = ['レビューID','review_id','注文ID','ID','id','No','no','番号'];
     for (const alias of idAliases) {
       if (row[alias] && row[alias].trim()) return row[alias].trim();
     }
