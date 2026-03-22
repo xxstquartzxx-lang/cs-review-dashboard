@@ -59,6 +59,21 @@
     .upload-area input[type="file"]{display:none}
     .upload-area.loaded{padding:0;border:none;box-shadow:none;margin:0;height:0;overflow:hidden}
 
+    /* === アップロードステータス === */
+    .upload-status{
+      background:var(--color-box);border-radius:var(--radius);box-shadow:var(--shadow);
+      padding:10px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    }
+    .status-info{font-size:12px;color:var(--color-text);line-height:1.5}
+    .status-info strong{color:var(--color-primary)}
+    .status-info .dedup{color:var(--color-text-light);font-size:11px}
+    .status-add-btn{
+      padding:6px 14px;border:1.5px solid var(--color-border);border-radius:6px;
+      background:var(--color-box);color:var(--color-primary);font-size:12px;font-weight:600;
+      cursor:pointer;font-family:inherit;transition:all var(--transition);white-space:nowrap;
+    }
+    .status-add-btn:hover{border-color:var(--color-primary);background:#F0F7FC}
+
     .dashboard{display:none}
     .dashboard.visible{display:block;animation:fadeUp .35s ease}
     @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -181,6 +196,26 @@
     .trend-table-wrap{max-height:220px;overflow-y:auto;border:1px solid var(--color-border);border-radius:8px}
 
     .empty-msg{text-align:center;color:var(--color-text-light);padding:20px 0;font-size:13px}
+
+    /* === ツールチップ（共通） === */
+    .tooltip{
+      position:fixed;pointer-events:none;z-index:9999;
+      background:rgba(26,35,50,0.92);color:#fff;
+      padding:8px 14px;border-radius:7px;font-size:12px;line-height:1.6;
+      white-space:nowrap;opacity:0;transition:opacity .15s ease;
+      box-shadow:0 4px 16px rgba(0,0,0,0.18);max-width:320px;white-space:pre-line;
+    }
+    .tooltip.visible{opacity:1}
+    .tooltip .tt-title{font-weight:700;font-size:13px;margin-bottom:2px}
+    .tooltip .tt-sub{color:rgba(255,255,255,0.65);font-size:11px}
+    .tooltip .tt-row{display:flex;justify-content:space-between;gap:16px}
+    .tooltip .tt-val{font-weight:700}
+
+    /* === ホバーエフェクト === */
+    .keyword-item{transition:background .15s ease;border-radius:4px;padding:6px 4px}
+    .keyword-item:hover{background:rgba(26,91,142,0.05)}
+    .trend-table tr{transition:background .15s ease}
+
     .footer{text-align:center;padding:20px;color:var(--color-text-light);font-size:11px}
 
     @media(max-width:640px){
@@ -210,14 +245,19 @@
     <!-- CSVアップロードエリア -->
     <div class="upload-area" id="uploadArea">
       <div class="icon">📁</div>
-      <div class="label">CSVファイルをここにドラッグ＆ドロップ</div>
-      <div class="hint">または、クリックしてファイルを選択</div>
+      <div class="label">CSVファイルをここにドラッグ＆ドロップ（複数可）</div>
+      <div class="hint">または、クリックしてファイルを選択（Ctrl/Cmd+クリックで複数選択）</div>
       <div class="guide" style="margin-top:12px;font-size:12px;color:#6B7C93;line-height:1.7;text-align:left;max-width:520px">
         📌 <strong>CSVの取得方法：</strong><br>
         RMS ＞ コミュニティ ＞ レビューチェックツール ＞ そのまま何も触らずにCSVダウンロード<br>
-        <span style="font-size:11px;color:#8E8E93">（全期間の商品・ショップ両方のレビューが取得されます）</span>
+        <span style="font-size:11px;color:#8E8E93">（全期間の商品・ショップ両方のレビューが取得されます。3000件超の場合は複数ファイルをまとめて選択できます）</span>
       </div>
-      <input type="file" id="csvInput" accept=".csv,.txt">
+      <input type="file" id="csvInput" accept=".csv,.txt" multiple>
+    </div>
+    <!-- 読み込みステータス（ファイル追加読み込み対応） -->
+    <div class="upload-status" id="uploadStatus" style="display:none">
+      <div class="status-info" id="statusInfo"></div>
+      <button class="status-add-btn" id="addMoreBtn">＋ CSVを追加読み込み</button>
     </div>
 
     <!-- ★ ダッシュボード本体 -->
@@ -296,8 +336,30 @@
     </div>
     <div class="footer">レビュー分析ダッシュボード — ブラウザ完結型ツール</div>
   </div>
+  <!-- ツールチップ要素 -->
+  <div class="tooltip" id="tooltip"></div>
 
   <script>
+  // ======================================================
+  // ツールチップ操作
+  // ======================================================
+  var tooltipEl = document.getElementById('tooltip');
+  function showTip(e, html) {
+    tooltipEl.innerHTML = html;
+    tooltipEl.classList.add('visible');
+    moveTip(e);
+  }
+  function moveTip(e) {
+    var x = e.clientX + 14, y = e.clientY - 10;
+    tooltipEl.style.left = x + 'px';
+    tooltipEl.style.top = y + 'px';
+    var rect = tooltipEl.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) tooltipEl.style.left = (e.clientX - rect.width - 14) + 'px';
+    if (rect.bottom > window.innerHeight - 8) tooltipEl.style.top = (e.clientY - rect.height - 10) + 'px';
+    if (rect.top < 4) tooltipEl.style.top = '4px';
+  }
+  function hideTip() { tooltipEl.classList.remove('visible'); }
+
   // ======================================================
   // ■ 設定エリア（★ カスタマイズはここ ★）
   // ======================================================
@@ -381,6 +443,11 @@
   let colProduct = null;
   let colDate    = null;
 
+  // 複数ファイル管理用
+  let loadedFiles = [];       // 読み込んだファイル名の一覧
+  let totalRawCount = 0;      // 重複除去前の合計行数
+  let dedupRemovedCount = 0;  // 除去された重複行数
+
 
   // ======================================================
   // ■ DOM要素
@@ -395,92 +462,189 @@
   const tabContents     = document.getElementById('tabContents');
   const cooccurrenceMap = document.getElementById('cooccurrenceMap');
   const suggestionList  = document.getElementById('suggestionList');
+  const uploadStatus    = document.getElementById('uploadStatus');
+  const statusInfo      = document.getElementById('statusInfo');
+  const addMoreBtn      = document.getElementById('addMoreBtn');
 
 
   // ======================================================
-  // ■ アップロード操作
+  // ■ アップロード操作（複数ファイル対応）
   // ======================================================
   uploadArea.addEventListener('click', () => csvInput.click());
   document.getElementById('headerUploadBtn').addEventListener('click', () => csvInput.click());
-  csvInput.addEventListener('change', e => { if(e.target.files.length) handleFile(e.target.files[0]); });
+  addMoreBtn.addEventListener('click', () => csvInput.click());
+
+  csvInput.addEventListener('change', e => {
+    if (e.target.files.length) handleFiles(e.target.files);
+    csvInput.value = '';  // 同じファイルを再選択できるようにリセット
+  });
+
   uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
   uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
   uploadArea.addEventListener('drop', e => {
     e.preventDefault(); uploadArea.classList.remove('dragover');
-    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
   });
 
-  /* 商品が切り替わったら再描画 */
   productSelect.addEventListener('change', () => renderDashboard());
 
 
   // ======================================================
-  // ■ ファイル読み込み
+  // ■ 複数ファイル読み込み
   // ======================================================
-  function handleFile(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      parsedData = parseCSV(e.target.result);
-      if (!parsedData.length) { alert('CSVの解析結果が0件でした。文字コードを確認してください。'); return; }
 
-      uploadArea.querySelector('.label').textContent = `✅ ${file.name}（${parsedData.length}件）`;
-      uploadArea.querySelector('.hint').textContent = '別のファイルを読み込むにはもう一度クリック';
-      uploadArea.classList.add('loaded');
-      // ヘッダーのバッジを更新
-      var badge = document.getElementById('headerUploadBtn');
-      if (badge) { badge.textContent = '✅ ' + file.name; badge.style.color = 'var(--color-positive)'; badge.style.borderColor = 'var(--color-positive)'; }
+  /**
+   * 重複判定用のキーを生成する関数
+   * レビュー本文＋評価＋商品名＋日付を結合してキーとする
+   * （レビューIDがCSVにあればそれを使うが、ない場合のフォールバック）
+   */
+  function makeRowKey(row) {
+    // まずレビューIDっぽい列を探す
+    const idAliases = ['レビューID','review_id','ID','id','No','no','番号'];
+    for (const alias of idAliases) {
+      if (row[alias] && row[alias].trim()) return row[alias].trim();
+    }
+    // IDがなければ内容ベースでキーを生成
+    const parts = [];
+    if (colReview)  parts.push((row[colReview] || '').trim().slice(0, 100));
+    if (colRating)  parts.push((row[colRating] || '').trim());
+    if (colProduct) parts.push((row[colProduct] || '').trim().slice(0, 50));
+    if (colDate)    parts.push((row[colDate] || '').trim());
+    return parts.join('|||');
+  }
 
-      // 列名を自動検出
-      const sample = parsedData[0];
-      colReview  = findColumn(sample, 'reviewText');
-      colRating  = findColumn(sample, 'rating');
-      colType    = findColumn(sample, 'type');
-      colProduct = findColumn(sample, 'productName');
-      colDate    = findColumn(sample, 'reviewDate');
+  /**
+   * 複数ファイルを順番に読み込み、マージ＋重複除去してダッシュボードを更新
+   */
+  function handleFiles(fileList) {
+    const files = Array.from(fileList);
+    let pending = files.length;
+    let newRows = [];
 
-      // 日付列フォールバック（日付っぽい値が多い列を探す）
-      // ※ 年が1900〜2099の範囲内であることをチェック
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const rows = parseCSV(e.target.result);
+        newRows = newRows.concat(rows);
+        loadedFiles.push(file.name);
+        pending--;
+
+        if (pending === 0) {
+          // 全ファイル読み込み完了 → マージ＋重複除去
+          mergeAndDeduplicate(newRows);
+        }
+      };
+      reader.readAsText(file, 'Shift_JIS');
+    });
+  }
+
+  /**
+   * 新しい行データを既存データにマージし、重複を除去する
+   */
+  function mergeAndDeduplicate(newRows) {
+    if (!newRows.length && !parsedData.length) {
+      alert('CSVの解析結果が0件でした。文字コードを確認してください。');
+      return;
+    }
+
+    // 列名を検出（初回のみ、またはまだ未検出の場合）
+    const sample = newRows[0] || parsedData[0];
+    if (sample) {
+      if (!colReview)  colReview  = findColumn(sample, 'reviewText');
+      if (!colRating)  colRating  = findColumn(sample, 'rating');
+      if (!colType)    colType    = findColumn(sample, 'type');
+      if (!colProduct) colProduct = findColumn(sample, 'productName');
+      if (!colDate)    colDate    = findColumn(sample, 'reviewDate');
+
+      // 日付列フォールバック
       if (!colDate) {
         let bs = 0;
         const dateRe = /(19|20)\d{2}[\/\-年]\d{1,2}/;
+        const allRows = parsedData.concat(newRows);
         Object.keys(sample).forEach(k => {
-          const s = parsedData.filter(r => dateRe.test(r[k] || '')).length;
+          const s = allRows.filter(r => dateRe.test(r[k] || '')).length;
           if (s > bs) { bs = s; colDate = k; }
         });
-        // さらに見つからなければ YYYYMMDD 形式（8桁数字）を探す
         if (!bs) {
           Object.keys(sample).forEach(k => {
-            const s = parsedData.filter(r => /^(19|20)\d{6}/.test((r[k]||'').trim())).length;
+            const s = allRows.filter(r => /^(19|20)\d{6}/.test((r[k]||'').trim())).length;
             if (s > bs) { bs = s; colDate = k; }
           });
         }
       }
 
-      // レビュー本文フォールバック（一番文字数が多い列）
+      // レビュー本文フォールバック
       if (!colReview) {
         let mx = 0;
+        const allRows = parsedData.concat(newRows);
         Object.keys(sample).forEach(k => {
-          const t = parsedData.reduce((s, r) => s + (r[k] || '').length, 0);
+          const t = allRows.reduce((s, r) => s + (r[k] || '').length, 0);
           if (t > mx) { mx = t; colReview = k; }
         });
       }
-      // 評価点フォールバック（1〜5の数値が多い列）
+
+      // 評価点フォールバック
       if (!colRating) {
         let bs = 0;
+        const allRows = parsedData.concat(newRows);
         Object.keys(sample).forEach(k => {
-          const s = parsedData.filter(r => { const v = parseFloat(r[k]); return v >= 1 && v <= 5; }).length;
+          const s = allRows.filter(r => { const v = parseFloat(r[k]); return v >= 1 && v <= 5; }).length;
           if (s > bs) { bs = s; colRating = k; }
         });
       }
+    }
 
-      buildProductSelector();
-      renderGlobalSummary();
-      dashboard.classList.add('visible');
-      renderDashboard();
-      dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-    // ★ 文字化けする場合は 'Shift_JIS' → 'UTF-8' に変更
-    reader.readAsText(file, 'Shift_JIS');
+    // 既存データのキーをSetに保持
+    const existingKeys = new Set();
+    parsedData.forEach(row => existingKeys.add(makeRowKey(row)));
+
+    // 新しい行をマージ（重複はスキップ）
+    const beforeCount = parsedData.length;
+    totalRawCount += newRows.length;
+    let addedCount = 0;
+
+    newRows.forEach(row => {
+      const key = makeRowKey(row);
+      if (!existingKeys.has(key)) {
+        existingKeys.add(key);
+        parsedData.push(row);
+        addedCount++;
+      }
+    });
+
+    dedupRemovedCount = totalRawCount - parsedData.length;
+
+    // UI更新
+    uploadArea.classList.add('loaded');
+    uploadStatus.style.display = 'flex';
+    updateStatusInfo();
+
+    var badge = document.getElementById('headerUploadBtn');
+    if (badge) {
+      badge.textContent = '✅ ' + parsedData.length + '件 読み込み済み';
+      badge.style.color = 'var(--color-positive)';
+      badge.style.borderColor = 'var(--color-positive)';
+    }
+
+    // ダッシュボード描画
+    buildProductSelector();
+    renderGlobalSummary();
+    dashboard.classList.add('visible');
+    renderDashboard();
+    dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /**
+   * ステータス表示を更新
+   */
+  function updateStatusInfo() {
+    let html = '<strong>' + loadedFiles.length + '</strong> ファイル読み込み済み（';
+    html += '<strong>' + parsedData.length + '</strong> 件のユニークレビュー）';
+    if (dedupRemovedCount > 0) {
+      html += '<br><span class="dedup">※ ' + dedupRemovedCount + ' 件の重複データを自動除去しました</span>';
+    }
+    html += '<br><span class="dedup">' + loadedFiles.join('、') + '</span>';
+    statusInfo.innerHTML = html;
   }
 
 
@@ -666,6 +830,7 @@
       const revs = groups[s], act = s === 5 ? 'active' : '';
       tabBar.innerHTML += `<button class="tab-btn ${act}" data-star="${s}">★${s}（${revs.length}）</button>`;
       const kw = countKeywords(revs);
+      const kwTotal = revs.length;
       let h = `<div class="tab-content ${act}" id="tab-${s}">`;
       if (!kw.length) { h += '<div class="empty-msg">該当キーワードなし</div>'; }
       else {
@@ -673,7 +838,8 @@
         h += '<ul class="keyword-list">';
         kw.slice(0, 10).forEach((k, i) => {
           const p = Math.round(k.count / mx * 100);
-          h += `<li class="keyword-item">
+          const kwPct = kwTotal ? Math.round(k.count / kwTotal * 100) : 0;
+          h += `<li class="keyword-item" data-kw="${esc(k.keyword)}" data-cnt="${k.count}" data-pct="${kwPct}" data-revs="${kwTotal}">
             <span class="keyword-rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
             <span class="keyword-name">${esc(k.keyword)}</span>
             <div class="keyword-bar-wrap"><div class="keyword-bar" style="width:${p}%"></div></div>
@@ -695,6 +861,19 @@
 
     // --- ③ 共起マップ（初期表示は★5のレビューで計算） ---
     renderCooccurrence(groups[5]);
+
+    // キーワードアイテムにホバーイベント登録
+    tabContents.querySelectorAll('.keyword-item').forEach(el => {
+      el.addEventListener('mouseenter', function(e) {
+        const kw = el.dataset.kw, cnt = el.dataset.cnt, pct = el.dataset.pct, revs = el.dataset.revs;
+        showTip(e, '<div class="tt-title">「' + kw + '」</div>'
+          + '<div class="tt-row"><span>出現回数</span><span class="tt-val">' + cnt + ' 回</span></div>'
+          + '<div class="tt-row"><span>レビュー中の出現率</span><span class="tt-val">' + pct + '%</span></div>'
+          + '<div class="tt-sub">（この評価帯の ' + revs + ' 件中）</div>');
+      });
+      el.addEventListener('mousemove', moveTip);
+      el.addEventListener('mouseleave', hideTip);
+    });
 
     // --- ④ 改善提案 ---
     const lowRevs = [...groups[1], ...groups[2]];
@@ -876,14 +1055,25 @@
       const line = document.createElementNS(NS, 'line');
       line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
       line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
-      // 共起数に応じて太さ・透明度を変える
       const thickness = 1 + (l.count / maxLink) * 3.5;
       const opacity = 0.15 + (l.count / maxLink) * 0.35;
       line.setAttribute('stroke', '#8E8E93');
       line.setAttribute('stroke-width', thickness);
       line.setAttribute('stroke-opacity', opacity);
       line.setAttribute('stroke-linecap', 'round');
+      // ホバー用の透明な太い線（当たり判定を広げる）
+      const hitLine = document.createElementNS(NS, 'line');
+      hitLine.setAttribute('x1', a.x); hitLine.setAttribute('y1', a.y);
+      hitLine.setAttribute('x2', b.x); hitLine.setAttribute('y2', b.y);
+      hitLine.setAttribute('stroke', 'transparent');
+      hitLine.setAttribute('stroke-width', Math.max(12, thickness + 8));
+      hitLine.style.cursor = 'pointer';
+      const tipHtml = '<div class="tt-title">' + esc(a.name) + ' × ' + esc(b.name) + '</div><div class="tt-row"><span>同時出現回数</span><span class="tt-val">' + l.count + ' 回</span></div>';
+      hitLine.addEventListener('mouseenter', function(e) { showTip(e, tipHtml); line.setAttribute('stroke', '#1A5B8E'); line.setAttribute('stroke-opacity', '0.7'); });
+      hitLine.addEventListener('mousemove', moveTip);
+      hitLine.addEventListener('mouseleave', function() { hideTip(); line.setAttribute('stroke', '#8E8E93'); line.setAttribute('stroke-opacity', opacity); });
       svg.appendChild(line);
+      svg.appendChild(hitLine);
     });
 
     // ノード（丸＋テキスト）を描画
@@ -954,6 +1144,24 @@
         g.appendChild(countText);
       }
 
+      // ホバー：このノードに接続されたキーワードの一覧を表示
+      g.style.cursor = 'pointer';
+      var connectedHtml = '<div class="tt-title">' + esc(n.name) + '</div><div class="tt-row"><span>出現回数</span><span class="tt-val">' + n.count + ' 回</span></div>';
+      var connected = links.filter(function(l) { return l.s === n.id || l.t === n.id; })
+        .sort(function(a, b) { return b.count - a.count; }).slice(0, 6);
+      if (connected.length) {
+        connectedHtml += '<div class="tt-sub" style="margin-top:4px;border-top:1px solid rgba(255,255,255,0.15);padding-top:4px">共起キーワード</div>';
+        connected.forEach(function(l) {
+          var other = l.s === n.id ? nodes[l.t] : nodes[l.s];
+          connectedHtml += '<div class="tt-row"><span>' + esc(other.name) + '</span><span class="tt-val">' + l.count + ' 回</span></div>';
+        });
+      }
+      (function(tipHtml, circle, origFill) {
+        g.addEventListener('mouseenter', function(e) { showTip(e, tipHtml); circle.setAttribute('stroke-width', '3'); });
+        g.addEventListener('mousemove', moveTip);
+        g.addEventListener('mouseleave', function() { hideTip(); circle.setAttribute('stroke-width', '1.5'); });
+      })(connectedHtml, circle, circle.getAttribute('fill'));
+
       svg.appendChild(g);
     });
 
@@ -1023,7 +1231,7 @@
     });
 
     // --- SVG折れ線グラフの描画 ---
-    const W = 700, H = 220, padL = 44, padR = 44, padT = 28, padB = 40;
+    const W = 700, H = 260, padL = 44, padR = 50, padT = 36, padB = 44;
     const chartW = W - padL - padR;
     const chartH = H - padT - padB;
     const n = points.length;
@@ -1040,54 +1248,106 @@
     // X座標
     const toX = i => padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
 
+    // 件数の塗りつぶし面（薄い青の面グラフ）
+    let areaPath = `M${toX(0).toFixed(1)},${(padT + chartH).toFixed(1)}`;
+    points.forEach((p, i) => { areaPath += ` L${toX(i).toFixed(1)},${toYc(p.count).toFixed(1)}`; });
+    areaPath += ` L${toX(n - 1).toFixed(1)},${(padT + chartH).toFixed(1)} Z`;
+
     // 評価の折れ線パス
     const avgPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.avg).toFixed(1)}`).join(' ');
     // 件数の折れ線パス
     const cntPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toYc(p.count).toFixed(1)}`).join(' ');
 
-    // X軸ラベル（多い場合は間引き）
+    // X軸ラベル（間引き）
     const labelStep = Math.max(1, Math.ceil(n / 12));
     let xLabels = '';
     points.forEach((p, i) => {
       if (i % labelStep === 0 || i === n - 1) {
-        xLabels += `<text x="${toX(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#6B7C93">${p.label}</text>`;
+        xLabels += `<text x="${toX(i)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#6B7C93">${p.label}</text>`;
       }
     });
 
-    // Y軸ラベル（評価 左）
+    // Y軸グリッド線＋左ラベル（評価）
     let yLabelsL = '';
     for (let v = 1; v <= 5; v++) {
-      yLabelsL += `<text x="${padL - 6}" y="${toY(v) + 3}" text-anchor="end" font-size="10" fill="#6B7C93">${v}</text>`;
-      yLabelsL += `<line x1="${padL}" y1="${toY(v)}" x2="${padL + chartW}" y2="${toY(v)}" stroke="#E1E5EB" stroke-dasharray="3,3"/>`;
+      yLabelsL += `<text x="${padL - 8}" y="${toY(v) + 3}" text-anchor="end" font-size="10" fill="#6B7C93">${v}</text>`;
+      yLabelsL += `<line x1="${padL}" y1="${toY(v)}" x2="${padL + chartW}" y2="${toY(v)}" stroke="#E8EAED" stroke-dasharray="3,3"/>`;
     }
 
-    // Y軸ラベル（件数 右）
+    // 右ラベル（件数）青系で統一
     let yLabelsR = '';
     const cStep = Math.max(1, Math.ceil(countCeil / 4));
     for (let v = 0; v <= countCeil; v += cStep) {
-      yLabelsR += `<text x="${W - padR + 6}" y="${toYc(v) + 3}" text-anchor="start" font-size="10" fill="#27AE60">${v}</text>`;
+      yLabelsR += `<text x="${W - padR + 8}" y="${toYc(v) + 3}" text-anchor="start" font-size="10" fill="#93B5CF">${v}</text>`;
     }
 
-    // ドットとツールチップ用の円
-    let avgDots = '', cntDots = '';
+    // データラベル（間引いて重ならないように）
+    const dataLabelStep = Math.max(1, Math.ceil(n / 10));
+    let avgLabels = '', cntLabels = '';
+    points.forEach((p, i) => {
+      if (i % dataLabelStep === 0 || i === n - 1 || i === 0) {
+        // 評価ラベル（線の上）
+        avgLabels += `<text x="${toX(i)}" y="${toY(p.avg) - 8}" text-anchor="middle" font-size="10" font-weight="700" fill="#1A5B8E">${p.avg}</text>`;
+        // 件数ラベル（線の下）
+        const cntY = toYc(p.count);
+        const labelY = cntY > padT + chartH - 20 ? cntY - 8 : cntY + 14;
+        cntLabels += `<text x="${toX(i)}" y="${labelY}" text-anchor="middle" font-size="9" font-weight="600" fill="#93B5CF">${p.count}</text>`;
+      }
+    });
+
+    // ドット＋ホバー用ヒット領域
+    let avgDots = '', cntDots = '', hitDots = '';
     points.forEach((p, i) => {
       avgDots += `<circle cx="${toX(i)}" cy="${toY(p.avg)}" r="3.5" fill="#1A5B8E" stroke="#fff" stroke-width="1.5"/>`;
-      cntDots += `<circle cx="${toX(i)}" cy="${toYc(p.count)}" r="3.5" fill="#27AE60" stroke="#fff" stroke-width="1.5"/>`;
+      cntDots += `<circle cx="${toX(i)}" cy="${toYc(p.count)}" r="2.5" fill="#93B5CF" stroke="#fff" stroke-width="1"/>`;
+      hitDots += `<circle cx="${toX(i)}" cy="${toY(p.avg)}" r="14" fill="transparent" data-idx="${i}" class="trend-hit" style="cursor:pointer"/>`;
     });
+
+    // 軸タイトル
+    const axisLabelL = `<text x="${padL - 8}" y="${padT - 14}" text-anchor="end" font-size="9" fill="#6B7C93" font-weight="600">評価</text>`;
+    const axisLabelR = `<text x="${W - padR + 8}" y="${padT - 14}" text-anchor="start" font-size="9" fill="#93B5CF" font-weight="600">件数</text>`;
+
+    // 凡例
+    const legend = `
+      <line x1="${padL}" y1="14" x2="${padL + 18}" y2="14" stroke="#1A5B8E" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="${padL + 22}" y="17" font-size="10" fill="#1A5B8E" font-weight="600">平均評価</text>
+      <line x1="${padL + 78}" y1="14" x2="${padL + 96}" y2="14" stroke="#B8D4E8" stroke-width="2" stroke-dasharray="4,3" stroke-linecap="round"/>
+      <text x="${padL + 100}" y="17" font-size="10" fill="#93B5CF" font-weight="600">件数</text>`;
 
     trendChart.innerHTML = `
       <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="font-family:inherit">
         ${yLabelsL}${yLabelsR}${xLabels}
-        <!-- 件数（緑） -->
-        <path d="${cntPath}" fill="none" stroke="#27AE60" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+        ${axisLabelL}${axisLabelR}
+        ${legend}
+        <!-- 件数の面グラフ（薄い塗り） -->
+        <path d="${areaPath}" fill="rgba(26,91,142,0.06)"/>
+        <!-- 件数の線（薄い青、破線） -->
+        <path d="${cntPath}" fill="none" stroke="#B8D4E8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5,4"/>
         ${cntDots}
-        <!-- 評価（青） -->
+        ${cntLabels}
+        <!-- 評価の線（濃い青、実線） -->
         <path d="${avgPath}" fill="none" stroke="#1A5B8E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         ${avgDots}
-        <!-- 凡例 -->
-        <circle cx="${padL + 8}" cy="12" r="4" fill="#1A5B8E"/><text x="${padL + 16}" y="15" font-size="11" fill="#2C3E50">平均評価（左軸）</text>
-        <circle cx="${padL + 120}" cy="12" r="4" fill="#27AE60"/><text x="${padL + 128}" y="15" font-size="11" fill="#2C3E50">件数（右軸）</text>
+        ${avgLabels}
+        <!-- ホバー用ヒット領域 -->
+        ${hitDots}
       </svg>`;
+
+    // ドットにホバーイベントを追加
+    trendChart.querySelectorAll('.trend-hit').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      const p = points[idx];
+      const d = monthMap[p.key];
+      const distM = [0,0,0,0,0];
+      d.ratings.forEach(v => { const ii = Math.round(v)-1; if(ii>=0&&ii<=4) distM[ii]++; });
+      const tipHtml = '<div class="tt-title">' + p.label + '</div>'
+        + '<div class="tt-row"><span>平均評価</span><span class="tt-val">' + p.avg + '</span></div>'
+        + '<div class="tt-row"><span>件数</span><span class="tt-val">' + p.count + ' 件</span></div>'
+        + '<div class="tt-sub" style="margin-top:3px">★5:' + distM[4] + '  ★4:' + distM[3] + '  ★3:' + distM[2] + '  ★2:' + distM[1] + '  ★1:' + distM[0] + '</div>';
+      el.addEventListener('mouseenter', function(e) { showTip(e, tipHtml); });
+      el.addEventListener('mousemove', moveTip);
+      el.addEventListener('mouseleave', hideTip);
+    });
 
     // --- データテーブル ---
     let rows = '<thead><tr><th>年月</th><th>件数</th><th>平均評価</th><th>★5</th><th>★4</th><th>★3</th><th>★2</th><th>★1</th></tr></thead><tbody>';
